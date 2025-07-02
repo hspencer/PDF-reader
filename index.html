@@ -4,113 +4,112 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PDF a Audiolibro con IA</title>
-    <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- PDF.js library from Mozilla to parse PDF files -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Lora Serif Font -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body {
-            font-family: 'Lora', serif;
-        }
-        #text-content::-webkit-scrollbar, #modal-content::-webkit-scrollbar {
-            width: 8px;
-        }
-        #text-content::-webkit-scrollbar-track, #modal-content::-webkit-scrollbar-track {
-            background: #f5f5f4;
-        }
-        #text-content::-webkit-scrollbar-thumb, #modal-content::-webkit-scrollbar-thumb {
-            background-color: #d6d3d1;
-            border-radius: 10px;
-            border: 2px solid #f5f5f4;
-        }
+        body { font-family: 'Lora', serif; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f5f5f4; }
+        ::-webkit-scrollbar-thumb { background-color: #d6d3d1; border-radius: 10px; border: 2px solid #f5f5f4; }
         #pdf-input { display: none; }
         input[type=range]::-webkit-slider-thumb {
-           -webkit-appearance: none;
-           appearance: none;
-           width: 16px;
-           height: 16px;
-           background: #c2410c;
-           cursor: pointer;
-           border-radius: 50%;
-           margin-top: -6px;
+           -webkit-appearance: none; appearance: none;
+           width: 16px; height: 16px; background: #c2410c;
+           cursor: pointer; border-radius: 50%; margin-top: -6px;
+        }
+        /* Layout-specific styles */
+        #main-view.reading-layout { display: grid; }
+        .toc-item { cursor: pointer; padding: 4px 8px; border-radius: 4px; transition: background-color 0.2s; }
+        .toc-item:hover { background-color: #f5f5f4; }
+        .toc-item.active { background-color: #fed7aa; color: #9a3412; }
+        /* **FIX**: Added scroll to modal body */
+        #modal-body {
+            max-height: 65vh;
+            overflow-y: auto;
+            padding-right: 0.5rem; /* Space for scrollbar */
         }
     </style>
 </head>
 <body class="bg-stone-100 text-stone-800 flex items-center justify-center min-h-screen p-4">
 
-    <div class="w-full max-w-4xl bg-white rounded-lg shadow-lg border border-stone-200 p-6 md:p-8 space-y-6 relative">
-        <!-- Settings Icon -->
-        <button id="settings-btn" class="absolute top-4 right-4 text-stone-400 hover:text-orange-700 transition-colors">
-            <i class="fas fa-cog fa-lg"></i>
-        </button>
-
-        <!-- Header -->
-        <div class="text-center border-b border-stone-200 pb-4">
-            <h1 class="text-3xl md:text-4xl font-semibold text-stone-700">Tu Lector de PDF Personal</h1>
-            <p class="text-stone-500 mt-2">Convierte cualquier PDF en un audiolibro y obtén resúmenes con IA.</p>
+    <div id="main-view" class="w-full max-w-7xl h-[90vh] bg-white rounded-lg shadow-lg border border-stone-200 relative">
+        <!-- Initial Upload View -->
+        <div id="upload-view" class="w-full h-full flex flex-col justify-center items-center p-6 md:p-8 space-y-6">
+            <div class="text-center border-b border-stone-200 pb-4 w-full max-w-4xl">
+                <h1 class="text-3xl md:text-4xl font-semibold text-stone-700">Tu Lector de PDF Personal</h1>
+                <p class="text-stone-500 mt-2">Convierte cualquier PDF en un audiolibro y obtén resúmenes con IA.</p>
+            </div>
+            <div class="border-2 border-dashed border-stone-300 rounded-lg p-8 text-center hover:bg-stone-50 transition-colors w-full max-w-4xl">
+                <label for="pdf-input" class="cursor-pointer">
+                    <i class="fas fa-file-pdf fa-3x text-stone-400 mb-4"></i>
+                    <h2 id="upload-text" class="text-xl font-medium text-stone-700">Selecciona un archivo PDF para comenzar</h2>
+                    <p id="file-name" class="text-orange-700 mt-2 font-medium"></p>
+                </label>
+                <input type="file" id="pdf-input" accept=".pdf">
+            </div>
         </div>
 
-        <!-- File Upload Section -->
-        <div id="upload-section" class="border-2 border-dashed border-stone-300 rounded-lg p-8 text-center hover:bg-stone-50 transition-colors">
-            <label for="pdf-input" class="cursor-pointer">
-                <i class="fas fa-file-pdf fa-3x text-stone-400 mb-4"></i>
-                <h2 id="upload-text" class="text-xl font-medium text-stone-700">Selecciona un archivo PDF para comenzar</h2>
-                <p id="file-name" class="text-orange-700 mt-2 font-medium"></p>
-            </label>
-            <input type="file" id="pdf-input" accept=".pdf">
-        </div>
-
-        <!-- Controls Section -->
-        <div id="controls-section" class="hidden">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 bg-stone-50 p-6 rounded-lg border border-stone-200">
-                <div class="flex items-center justify-center space-x-4">
-                    <button id="play-pause-btn" class="w-16 h-16 bg-orange-600 hover:bg-orange-700 text-white rounded-full flex items-center justify-center text-3xl transition-all duration-300 shadow-sm">
-                        <i id="play-pause-icon" class="fas fa-play"></i>
-                    </button>
-                    <button id="stop-btn" class="w-16 h-16 bg-stone-600 hover:bg-stone-700 text-white rounded-full flex items-center justify-center text-3xl transition-all duration-300 shadow-sm">
-                        <i class="fas fa-stop"></i>
-                    </button>
-                </div>
-                <div class="md:col-span-2 space-y-4">
+        <!-- Reading View (2-column layout) -->
+        <div id="reading-view" class="hidden w-full h-full md:grid md:grid-cols-12">
+            <!-- Left Sidebar: Controls & TOC -->
+            <aside class="col-span-12 md:col-span-4 lg:col-span-3 bg-stone-50/70 border-r border-stone-200 p-4 overflow-y-auto">
+                <div class="space-y-6">
+                    <!-- Audio Controls -->
                     <div>
-                        <label for="voice-select" class="block text-sm font-medium text-stone-600 mb-1">Voz</label>
-                        <select id="voice-select" class="w-full bg-white border border-stone-300 rounded-md p-2 focus:ring-2 focus:ring-orange-500 focus:outline-none focus:border-orange-500"></select>
+                        <h3 class="font-bold text-stone-700 mb-3">Controles de Audio</h3>
+                        <div class="p-4 rounded-lg bg-white border border-stone-200 space-y-4">
+                            <div class="flex items-center justify-center space-x-4">
+                                <button id="play-pause-btn" class="w-16 h-16 bg-orange-600 hover:bg-orange-700 text-white rounded-full flex items-center justify-center text-3xl transition-all duration-300 shadow-sm"><i id="play-pause-icon" class="fas fa-play"></i></button>
+                                <button id="stop-btn" class="w-16 h-16 bg-stone-600 hover:bg-stone-700 text-white rounded-full flex items-center justify-center text-3xl transition-all duration-300 shadow-sm"><i class="fas fa-stop"></i></button>
+                            </div>
+                            <div>
+                                <label for="voice-select" class="block text-sm font-medium text-stone-600 mb-1">Voz</label>
+                                <select id="voice-select" class="w-full bg-white border border-stone-300 rounded-md p-2 focus:ring-2 focus:ring-orange-500"></select>
+                            </div>
+                            <div>
+                                <label for="rate-slider" class="block text-sm font-medium text-stone-600 mb-1">Velocidad: <span id="rate-value">1</span>x</label>
+                                <input id="rate-slider" type="range" min="0.5" max="2" step="0.1" value="1" class="w-full h-1 bg-stone-300 rounded-lg appearance-none cursor-pointer">
+                            </div>
+                        </div>
                     </div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label for="rate-slider" class="block text-sm font-medium text-stone-600 mb-1">Velocidad: <span id="rate-value">1</span>x</label>
-                            <input id="rate-slider" type="range" min="0.5" max="2" step="0.1" value="1" class="w-full h-1 bg-stone-300 rounded-lg appearance-none cursor-pointer">
+                    <!-- Navigation -->
+                    <div>
+                        <h3 class="font-bold text-stone-700 mb-3">Navegación</h3>
+                        <div class="p-4 rounded-lg bg-white border border-stone-200 space-y-4">
+                            <div class="flex justify-between items-center">
+                                <button id="prev-page-btn" class="p-2 bg-stone-200 hover:bg-stone-300 rounded-md"><i class="fas fa-arrow-left"></i> Anterior</button>
+                                <p class="text-stone-600 font-medium">Página <span id="current-page">0</span> / <span id="total-pages">0</span></p>
+                                <button id="next-page-btn" class="p-2 bg-stone-200 hover:bg-stone-300 rounded-md">Siguiente <i class="fas fa-arrow-right"></i></button>
+                            </div>
                         </div>
-                        <div>
-                            <label for="pitch-slider" class="block text-sm font-medium text-stone-600 mb-1">Tono: <span id="pitch-value">1</span></label>
-                            <input id="pitch-slider" type="range" min="0" max="2" step="0.1" value="1" class="w-full h-1 bg-stone-300 rounded-lg appearance-none cursor-pointer">
-                        </div>
+                    </div>
+                    <!-- Table of Contents -->
+                    <div id="toc-section" class="hidden">
+                        <h3 class="font-bold text-stone-700 mb-3">Índice del Documento</h3>
+                        <div id="toc-list" class="p-2 rounded-lg bg-white border border-stone-200 max-h-60 overflow-y-auto text-sm"></div>
                     </div>
                 </div>
-            </div>
-            <div id="status-display" class="text-center mt-4 text-stone-500">
-                <p>Página <span id="current-page">0</span> de <span id="total-pages">0</span></p>
-            </div>
+            </aside>
+
+            <!-- Right Panel: Content & AI -->
+            <main class="col-span-12 md:col-span-8 lg:col-span-9 p-6 flex flex-col h-full overflow-y-auto">
+                <div class="flex-grow">
+                    <h3 class="text-lg font-medium mb-2 text-stone-600">Texto de la página actual:</h3>
+                    <textarea id="text-content" readonly class="w-full h-full bg-stone-50 border border-stone-200 rounded-lg p-4 text-stone-700 resize-none focus:outline-none"></textarea>
+                </div>
+                <div id="ai-actions-section" class="text-center space-x-2 sm:space-x-4 mt-4 flex-shrink-0">
+                    <button id="summarize-btn" class="bg-stone-700 hover:bg-stone-800 text-white font-medium py-2 px-4 rounded-md transition-colors duration-300 shadow-sm">✨ Resumir Página</button>
+                    <button id="key-points-btn" class="bg-stone-700 hover:bg-stone-800 text-white font-medium py-2 px-4 rounded-md transition-colors duration-300 shadow-sm">✨ Puntos Clave</button>
+                </div>
+            </main>
         </div>
 
-        <!-- Text Display Area and AI Actions -->
-        <div id="text-display-section" class="hidden">
-            <h3 class="text-lg font-medium mb-2 text-stone-600">Texto de la página actual:</h3>
-            <textarea id="text-content" readonly class="w-full h-48 bg-stone-50 border border-stone-200 rounded-lg p-4 text-stone-700 resize-none focus:outline-none"></textarea>
-            <div id="ai-actions-section" class="text-center space-x-2 sm:space-x-4 mt-4">
-                <button id="summarize-btn" class="bg-stone-700 hover:bg-stone-800 text-white font-medium py-2 px-4 rounded-md transition-colors duration-300 text-sm sm:text-base shadow-sm">
-                    ✨ Resumir Página
-                </button>
-                <button id="key-points-btn" class="bg-stone-700 hover:bg-stone-800 text-white font-medium py-2 px-4 rounded-md transition-colors duration-300 text-sm sm:text-base shadow-sm">
-                    ✨ Puntos Clave
-                </button>
-            </div>
-        </div>
+        <!-- Settings Icon (Global) -->
+        <button id="settings-btn" class="absolute top-4 right-4 text-stone-400 hover:text-orange-700 transition-colors z-10"><i class="fas fa-cog fa-lg"></i></button>
     </div>
 
     <!-- Universal Modal -->
@@ -118,33 +117,7 @@
         <div class="bg-white rounded-lg shadow-2xl w-full max-w-2xl p-6 relative border border-stone-200">
             <button id="close-modal-btn" class="absolute top-3 right-4 text-stone-400 hover:text-stone-600 text-2xl">&times;</button>
             <h2 id="modal-title" class="text-2xl font-semibold text-orange-700 mb-4"></h2>
-            
-            <!-- Gemini Result View -->
-            <div id="modal-gemini-view">
-                <div id="modal-content" class="text-stone-700 max-h-[60vh] overflow-y-auto pr-4">
-                    <div id="modal-loader" class="text-center hidden">
-                         <svg class="animate-spin h-8 w-8 text-orange-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        <p class="mt-2 text-stone-500">Procesando con Gemini...</p>
-                    </div>
-                    <p id="modal-text" class="whitespace-pre-wrap"></p>
-                </div>
-            </div>
-
-            <!-- API Key Settings View -->
-            <div id="modal-settings-view" class="hidden">
-                <p class="text-stone-600 mb-2">
-                    Para usar las funciones de IA, necesitas una API Key de Google AI Studio. Es gratis y fácil de obtener.
-                </p>
-                <p class="mb-4">
-                    <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-orange-600 hover:underline">Obtén tu API Key aquí &rarr;</a>
-                </p>
-                <label for="api-key-input" class="block text-sm font-medium text-stone-600 mb-1">Tu API Key de Gemini</label>
-                <input type="password" id="api-key-input" class="w-full bg-white border border-stone-300 rounded-md p-2 focus:ring-2 focus:ring-orange-500 focus:outline-none" placeholder="Pega tu clave aquí">
-                <button id="save-api-key-btn" class="mt-4 w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded-md transition-colors">Guardar Clave</button>
-            </div>
+            <div id="modal-body"></div>
         </div>
     </div>
 
@@ -152,134 +125,232 @@
         pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js`;
 
         // DOM Elements
-        const allDOMElements = {
+        const D = {
+            uploadView: document.getElementById('upload-view'),
+            readingView: document.getElementById('reading-view'),
             pdfInput: document.getElementById('pdf-input'),
             uploadText: document.getElementById('upload-text'),
             fileNameDisplay: document.getElementById('file-name'),
-            controlsSection: document.getElementById('controls-section'),
-            textDisplaySection: document.getElementById('text-display-section'),
             playPauseBtn: document.getElementById('play-pause-btn'),
             playPauseIcon: document.getElementById('play-pause-icon'),
             stopBtn: document.getElementById('stop-btn'),
             voiceSelect: document.getElementById('voice-select'),
             rateSlider: document.getElementById('rate-slider'),
-            pitchSlider: document.getElementById('pitch-slider'),
             rateValue: document.getElementById('rate-value'),
-            pitchValue: document.getElementById('pitch-value'),
             currentPageDisplay: document.getElementById('current-page'),
             totalPagesDisplay: document.getElementById('total-pages'),
+            prevPageBtn: document.getElementById('prev-page-btn'),
+            nextPageBtn: document.getElementById('next-page-btn'),
             textContent: document.getElementById('text-content'),
+            tocSection: document.getElementById('toc-section'),
+            tocList: document.getElementById('toc-list'),
             summarizeBtn: document.getElementById('summarize-btn'),
             keyPointsBtn: document.getElementById('key-points-btn'),
             settingsBtn: document.getElementById('settings-btn'),
             modal: document.getElementById('modal'),
             closeModalBtn: document.getElementById('close-modal-btn'),
             modalTitle: document.getElementById('modal-title'),
-            modalGeminiView: document.getElementById('modal-gemini-view'),
-            modalSettingsView: document.getElementById('modal-settings-view'),
-            modalLoader: document.getElementById('modal-loader'),
-            modalText: document.getElementById('modal-text'),
-            apiKeyInput: document.getElementById('api-key-input'),
-            saveApiKeyBtn: document.getElementById('save-api-key-btn'),
+            modalBody: document.getElementById('modal-body'),
         };
 
         // State variables
-        let pdfDoc = null, currentPageNum = 1, isReading = false, isPaused = false;
-        let utterance = null, voices = [], geminiApiKey = '';
-
+        let pdfDoc = null, currentPageNum = 1, currentFile = null;
+        let isReading = false, isPaused = false, utterance = null;
+        let voices = [], geminiApiKey = '';
         const synth = window.speechSynthesis;
 
-        function populateVoiceList() {
-            voices = synth.getVoices();
-            allDOMElements.voiceSelect.innerHTML = '';
-            voices.forEach((voice) => {
-                if (voice.lang.startsWith('es') || voice.lang.startsWith('en')) {
-                    const option = document.createElement('option');
-                    option.textContent = `${voice.name} (${voice.lang})`;
-                    if (voice.default && voice.lang.startsWith('es')) option.textContent += ' -- Default';
-                    option.setAttribute('data-name', voice.name);
-                    allDOMElements.voiceSelect.appendChild(option);
-                }
-            });
-            const spanishVoice = Array.from(allDOMElements.voiceSelect.options).find(o => o.textContent.includes('(es'));
-            if (spanishVoice) spanishVoice.selected = true;
+        // --- Core App Logic ---
+        function switchToReadingView() {
+            D.uploadView.classList.add('hidden');
+            D.readingView.classList.remove('hidden');
+            D.readingView.classList.add('md:grid');
         }
 
-        populateVoiceList();
-        if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = populateVoiceList;
+        function switchToUploadView() {
+            D.uploadView.classList.remove('hidden');
+            D.readingView.classList.add('hidden');
+            D.readingView.classList.remove('md:grid');
+            D.tocSection.classList.add('hidden');
+            D.tocList.innerHTML = '';
+        }
 
-        allDOMElements.pdfInput.addEventListener('change', (e) => {
+        // --- Caching Logic ---
+        function saveReadingPosition() {
+            if (currentFile) {
+                localStorage.setItem('pdfReader_lastFile', currentFile.name);
+                localStorage.setItem('pdfReader_lastPage', currentPageNum);
+            }
+        }
+
+        function loadReadingPosition(fileName) {
+            const lastFile = localStorage.getItem('pdfReader_lastFile');
+            const lastPage = parseInt(localStorage.getItem('pdfReader_lastPage'), 10);
+            if (lastFile === fileName && lastPage) {
+                if (confirm(`¿Quieres continuar leyendo "${fileName}" desde la página ${lastPage}?`)) {
+                    return lastPage;
+                }
+            }
+            return 1;
+        }
+
+        // --- PDF Processing and Text Filtering ---
+        D.pdfInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file || file.type !== 'application/pdf') return;
+            currentFile = file;
             handleStop();
             const fileReader = new FileReader();
             fileReader.onload = function() {
                 const typedarray = new Uint8Array(this.result);
-                allDOMElements.uploadText.textContent = 'Cargando PDF...';
-                allDOMElements.fileNameDisplay.textContent = '';
+                D.uploadText.textContent = 'Cargando PDF...';
                 pdfjsLib.getDocument(typedarray).promise.then(pdf => {
                     pdfDoc = pdf;
-                    allDOMElements.totalPagesDisplay.textContent = pdf.numPages;
-                    currentPageNum = 1;
-                    allDOMElements.currentPageDisplay.textContent = '1';
-                    allDOMElements.uploadText.textContent = 'Archivo cargado:';
-                    allDOMElements.fileNameDisplay.textContent = file.name;
-                    allDOMElements.controlsSection.classList.remove('hidden');
-                    allDOMElements.textDisplaySection.classList.remove('hidden');
-                    getPageText(1).then(text => allDOMElements.textContent.value = text);
+                    D.totalPagesDisplay.textContent = pdf.numPages;
+                    currentPageNum = loadReadingPosition(currentFile.name);
+                    renderPage(currentPageNum);
+                    switchToReadingView();
+                    renderTOC();
                 }).catch(err => {
                     console.error("Error loading PDF:", err);
-                    allDOMElements.uploadText.textContent = "Error al cargar el PDF.";
+                    D.uploadText.textContent = "Error al cargar el PDF.";
                 });
             };
             fileReader.readAsArrayBuffer(file);
         });
 
-        async function getPageText(pageNum) {
+        async function getFilteredPageText(pageNum) {
             if (!pdfDoc || pageNum < 1 || pageNum > pdfDoc.numPages) return '';
             const page = await pdfDoc.getPage(pageNum);
-            const textContentObj = await page.getTextContent();
-            return textContentObj.items.map(item => item.str).join(' ');
+            const textContent = await page.getTextContent();
+            const {
+                height
+            } = page.getViewport({
+                scale: 1
+            });
+
+            // Heuristic filtering: remove text in top/bottom 10% of the page (likely headers/footers)
+            // and purely numeric strings in the margins (likely page numbers).
+            const filteredItems = textContent.items.filter(item => {
+                const y_pos = item.transform[5];
+                // Check if text is in the main body (middle 80% of the page)
+                const inBody = y_pos > height * 0.10 && y_pos < height * 0.90;
+                // Check if it's a number, which might be a page number
+                const isNumeric = /^\d+$/.test(item.str.trim());
+                // Keep if it's in the body, or if it's not a number (to preserve titles that might be high on the page)
+                return inBody || !isNumeric;
+            });
+
+            return filteredItems.map(item => item.str).join(' ');
+        }
+        
+        async function renderPage(pageNum, autoRead = false) {
+            if (!pdfDoc || pageNum < 1 || pageNum > pdfDoc.numPages) return;
+            currentPageNum = pageNum;
+            D.currentPageDisplay.textContent = currentPageNum;
+            D.prevPageBtn.disabled = currentPageNum === 1;
+            D.nextPageBtn.disabled = currentPageNum === pdfDoc.numPages;
+
+            const text = await getFilteredPageText(pageNum);
+            D.textContent.value = text;
+            
+            updateActiveTOC();
+            saveReadingPosition();
+
+            if (autoRead) {
+                readText(text);
+            }
         }
 
-        async function readPage(pageNum) {
-            if (!isReading || pageNum > pdfDoc.numPages) {
+        // --- Table of Contents (TOC) ---
+        async function renderTOC() {
+            if (!pdfDoc) return;
+            const outline = await pdfDoc.getOutline();
+            if (!outline || outline.length === 0) {
+                D.tocSection.classList.add('hidden');
+                return;
+            }
+
+            D.tocList.innerHTML = '';
+            const fragment = document.createDocumentFragment();
+            outline.forEach(item => {
+                const li = document.createElement('li');
+                li.textContent = item.title;
+                li.className = 'toc-item';
+                li.dataset.dest = JSON.stringify(item.dest); // Store destination info
+                fragment.appendChild(li);
+            });
+            D.tocList.appendChild(fragment);
+            D.tocSection.classList.remove('hidden');
+        }
+
+        D.tocList.addEventListener('click', async (e) => {
+            if (e.target && e.target.matches('.toc-item')) {
+                const dest = JSON.parse(e.target.dataset.dest);
+                const destRef = dest[0];
+                const pageIndex = await pdfDoc.getPageIndex(destRef);
                 handleStop();
-                return;
+                renderPage(pageIndex + 1);
             }
-            allDOMElements.currentPageDisplay.textContent = pageNum;
-            const text = await getPageText(pageNum);
-            allDOMElements.textContent.value = text;
+        });
+        
+        function updateActiveTOC() {
+            // This is a simple implementation. A more robust one would check ranges.
+            document.querySelectorAll('.toc-item').forEach(item => item.classList.remove('active'));
+            // In a real scenario, we'd need to map page numbers back to TOC items.
+        }
 
-            if (!text.trim()) {
-                currentPageNum++;
-                readPage(currentPageNum);
-                return;
+        // --- Audio Controls ---
+        function populateVoiceList() {
+            voices = synth.getVoices();
+            D.voiceSelect.innerHTML = '';
+            voices.forEach((voice) => {
+                if (voice.lang.startsWith('es') || voice.lang.startsWith('en')) {
+                    const option = document.createElement('option');
+                    option.textContent = `${voice.name} (${voice.lang})`;
+                    if (voice.default && voice.lang.startsWith('es')) {
+                        option.textContent += ' -- Default';
+                    }
+                    option.setAttribute('data-name', voice.name);
+                    D.voiceSelect.appendChild(option);
+                }
+            });
+            const spanishVoice = Array.from(D.voiceSelect.options).find(o => o.textContent.includes('(es'));
+            if (spanishVoice) {
+                spanishVoice.selected = true;
             }
+        }
 
+        function readText(text) {
+            if (!text.trim()) return;
+            synth.cancel(); // Stop previous speech
             utterance = new SpeechSynthesisUtterance(text);
-            const selectedVoiceName = allDOMElements.voiceSelect.selectedOptions[0].getAttribute('data-name');
+            const selectedVoiceName = D.voiceSelect.selectedOptions[0].getAttribute('data-name');
             utterance.voice = voices.find(voice => voice.name === selectedVoiceName);
-            utterance.pitch = parseFloat(allDOMElements.pitchSlider.value);
-            utterance.rate = parseFloat(allDOMElements.rateSlider.value);
-            utterance.onend = () => { if (isReading) { currentPageNum++; readPage(currentPageNum); } };
-            utterance.onerror = (event) => { console.error('SpeechSynthesisUtterance.onerror', event); if (isReading) { currentPageNum++; readPage(currentPageNum); } };
+            utterance.rate = parseFloat(D.rateSlider.value);
+            utterance.onend = () => {
+                if (isReading && currentPageNum < pdfDoc.numPages) {
+                    renderPage(currentPageNum + 1, true); // Auto-advance and read
+                } else {
+                    handleStop(); // End of document
+                }
+            };
+            utterance.onerror = (event) => console.error('SpeechSynthesis.onerror', event);
             synth.speak(utterance);
         }
 
         function handlePlayPause() {
             if (!pdfDoc) return;
-            if (!isReading) {
+            if (!isReading) { // Start reading
                 isReading = true; isPaused = false;
-                allDOMElements.playPauseIcon.classList.replace('fa-play', 'fa-pause');
-                readPage(currentPageNum);
-            } else if (isPaused) {
+                D.playPauseIcon.classList.replace('fa-play', 'fa-pause');
+                renderPage(currentPageNum, true);
+            } else if (isPaused) { // Resume
                 isPaused = false;
-                allDOMElements.playPauseIcon.classList.replace('fa-play', 'fa-pause');
+                D.playPauseIcon.classList.replace('fa-play', 'fa-pause');
                 synth.resume();
-            } else {
+            } else { // Pause
                 isPaused = true;
-                allDOMElements.playPauseIcon.classList.replace('fa-pause', 'fa-play');
+                D.playPauseIcon.classList.replace('fa-pause', 'fa-play');
                 synth.pause();
             }
         }
@@ -287,132 +358,99 @@
         function handleStop() {
             isReading = false; isPaused = false;
             synth.cancel();
-            allDOMElements.playPauseIcon.classList.replace('fa-pause', 'fa-play');
-            currentPageNum = 1;
-            if (pdfDoc) {
-                allDOMElements.currentPageDisplay.textContent = '1';
-                getPageText(1).then(text => allDOMElements.textContent.value = text);
-            } else {
-                allDOMElements.currentPageDisplay.textContent = '0';
-                allDOMElements.totalPagesDisplay.textContent = '0';
-            }
+            D.playPauseIcon.classList.replace('fa-pause', 'fa-play');
+            saveReadingPosition();
         }
 
-        allDOMElements.playPauseBtn.addEventListener('click', handlePlayPause);
-        allDOMElements.stopBtn.addEventListener('click', handleStop);
-        allDOMElements.rateSlider.addEventListener('input', (e) => { allDOMElements.rateValue.textContent = parseFloat(e.target.value).toFixed(1); });
-        allDOMElements.pitchSlider.addEventListener('input', (e) => { allDOMElements.pitchValue.textContent = parseFloat(e.target.value).toFixed(1); });
+        // --- Event Listeners ---
+        D.playPauseBtn.addEventListener('click', handlePlayPause);
+        D.stopBtn.addEventListener('click', handleStop);
+        D.prevPageBtn.addEventListener('click', () => renderPage(currentPageNum - 1));
+        D.nextPageBtn.addEventListener('click', () => renderPage(currentPageNum + 1));
+        D.rateSlider.addEventListener('input', (e) => { D.rateValue.textContent = parseFloat(e.target.value).toFixed(1); });
 
-        // --- Modal & API Key Logic ---
-        function showModal(type, title) {
-            allDOMElements.modalTitle.textContent = title;
-            if (type === 'gemini') {
-                allDOMElements.modalGeminiView.classList.remove('hidden');
-                allDOMElements.modalSettingsView.classList.add('hidden');
-            } else if (type === 'settings') {
-                allDOMElements.modalGeminiView.classList.add('hidden');
-                allDOMElements.modalSettingsView.classList.remove('hidden');
-                allDOMElements.apiKeyInput.value = geminiApiKey;
-            }
-            allDOMElements.modal.classList.remove('hidden');
+        // --- Modal & API Logic ---
+        function showModal(title, content) {
+            D.modalTitle.textContent = title;
+            D.modalBody.innerHTML = '';
+            D.modalBody.appendChild(content);
+            D.modal.classList.remove('hidden');
         }
 
-        function hideModal() { allDOMElements.modal.classList.add('hidden'); }
-        function showLoader(show) {
-            allDOMElements.modalLoader.classList.toggle('hidden', !show);
-            allDOMElements.modalText.classList.toggle('hidden', show);
-        }
+        function hideModal() { D.modal.classList.add('hidden'); }
+        D.closeModalBtn.addEventListener('click', hideModal);
 
-        function loadApiKey() {
-            geminiApiKey = localStorage.getItem('geminiApiKey') || '';
+        function createSettingsView() {
+            const div = document.createElement('div');
+            div.innerHTML = `
+                <p class="text-stone-600 mb-2">Para usar las funciones de IA, necesitas una API Key de Google AI Studio.</p>
+                <p class="mb-4"><a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-orange-600 hover:underline">Obtén tu API Key aquí &rarr;</a></p>
+                <label for="api-key-input" class="block text-sm font-medium text-stone-600 mb-1">Tu API Key de Gemini</label>
+                <input type="password" id="api-key-input" class="w-full bg-white border border-stone-300 rounded-md p-2" placeholder="Pega tu clave aquí" value="${geminiApiKey}">
+                <button id="save-api-key-btn" class="mt-4 w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded-md">Guardar Clave</button>
+            `;
+            div.querySelector('#save-api-key-btn').onclick = () => {
+                geminiApiKey = div.querySelector('#api-key-input').value.trim();
+                if (geminiApiKey) {
+                    localStorage.setItem('geminiApiKey', geminiApiKey);
+                    alert('API Key guardada.');
+                    hideModal();
+                } else {
+                    alert('Por favor, introduce una API Key.');
+                }
+            };
+            return div;
         }
-
-        function saveApiKey() {
-            geminiApiKey = allDOMElements.apiKeyInput.value.trim();
-            if (geminiApiKey) {
-                localStorage.setItem('geminiApiKey', geminiApiKey);
-                alert('API Key guardada correctamente.');
-                hideModal();
-            } else {
-                alert('Por favor, introduce una API Key válida.');
-            }
-        }
-
-        allDOMElements.settingsBtn.addEventListener('click', () => showModal('settings', 'Ajustes de API'));
-        allDOMElements.closeModalBtn.addEventListener('click', hideModal);
-        allDOMElements.saveApiKeyBtn.addEventListener('click', saveApiKey);
         
-        // --- Gemini API Call ---
+        D.settingsBtn.addEventListener('click', () => showModal('Ajustes de API', createSettingsView()));
+
         async function callGemini(prompt, title) {
             if (!geminiApiKey) {
-                showModal('settings', 'Introduce tu API Key');
+                showModal('Ajustes de API', createSettingsView());
                 return;
             }
-            showModal('gemini', title);
-            showLoader(true);
-            allDOMElements.modalText.textContent = '';
+            const geminiView = document.createElement('div');
+            geminiView.innerHTML = `<div class="text-center"><svg class="animate-spin h-8 w-8 text-orange-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><p class="mt-2">Procesando...</p></div>`;
+            showModal(title, geminiView);
 
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`;
-            const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
-
             try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
+                const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) });
                 const result = await response.json();
-                if (!response.ok) {
-                    throw new Error(result.error?.message || 'Error en la respuesta de la API.');
-                }
-                allDOMElements.modalText.textContent = result.candidates[0].content.parts[0].text;
+                if (!response.ok) throw new Error(result.error?.message || 'Error en la respuesta.');
+                geminiView.innerHTML = `<p class="whitespace-pre-wrap">${result.candidates[0].content.parts[0].text}</p>`;
             } catch (error) {
-                console.error("Error calling Gemini API:", error);
-                allDOMElements.modalText.textContent = `Hubo un error al contactar a la IA. Verifica tu API Key y la consola para más detalles.\n\nError: ${error.message}`;
-            } finally {
-                showLoader(false);
+                geminiView.innerHTML = `<p>Hubo un error al contactar a la IA. Verifica tu API Key.<br><br>Error: ${error.message}</p>`;
             }
         }
 
-        allDOMElements.summarizeBtn.addEventListener('click', () => {
-            const pageText = allDOMElements.textContent.value;
-            if (!pageText.trim()) return;
-            const prompt = `Por favor, resume el siguiente texto extraído de un documento PDF. Sé conciso y claro, enfocándote en las ideas principales. El resumen debe estar en español.\n\nTexto a resumir:\n---\n${pageText}`;
+        D.summarizeBtn.addEventListener('click', () => {
+            const text = D.textContent.value;
+            if (!text.trim()) return;
+            const prompt = `Por favor, resume el siguiente texto extraído de un documento PDF. Sé conciso y claro, enfocándote en las ideas principales. El resumen debe estar en español.\n\nTexto a resumir:\n---\n${text}`;
             callGemini(prompt, '✨ Resumen de la Página');
         });
 
-        allDOMElements.keyPointsBtn.addEventListener('click', async () => {
+        D.keyPointsBtn.addEventListener('click', async () => {
             if (!pdfDoc) return;
-            if (!geminiApiKey) {
-                showModal('settings', 'Introduce tu API Key');
-                return;
-            }
-            showModal('gemini', '✨ Puntos Clave del Documento');
-            showLoader(true);
-            try {
-                let fullText = '';
-                const numPagesToProcess = Math.min(pdfDoc.numPages, 10);
-                for (let i = 1; i <= numPagesToProcess; i++) {
-                    fullText += await getPageText(i) + '\n\n';
-                }
-                if (!fullText.trim()) {
-                    allDOMElements.modalText.textContent = "No se pudo extraer texto del documento.";
-                    showLoader(false);
-                    return;
-                }
-                const prompt = `Analiza el siguiente texto, que corresponde a las primeras ${numPagesToProcess} páginas de un documento PDF. Extrae y lista los puntos clave o un resumen ejecutivo. La respuesta debe estar en español y ser fácil de leer, usando viñetas si es apropiado.\n\nTexto a analizar:\n---\n${fullText}`;
-                // We call the main function here, which handles the modal and API call
-                await callGemini(prompt, '✨ Puntos Clave del Documento');
-            } catch (error) {
-                console.error("Error getting key points:", error);
-                allDOMElements.modalText.textContent = "Hubo un error al procesar el documento para obtener los puntos clave.";
-                showLoader(false);
-            }
+            let fullText = '';
+            const numPages = Math.min(pdfDoc.numPages, 10);
+            for (let i = 1; i <= numPages; i++) { fullText += await getFilteredPageText(i) + '\n\n'; }
+            if (!fullText.trim()) { alert("No se pudo extraer texto."); return; }
+            const prompt = `Analiza el siguiente texto, que corresponde a las primeras ${numPages} páginas de un documento PDF. Extrae y lista los puntos clave o un resumen ejecutivo. La respuesta debe estar en español y ser fácil de leer, usando viñetas si es apropiado.\n\nTexto a analizar:\n---\n${fullText}`;
+            callGemini(prompt, '✨ Puntos Clave del Documento');
         });
-        
-        // Initial load
-        loadApiKey();
 
+        // --- Initial Load ---
+        function initialize() {
+            geminiApiKey = localStorage.getItem('geminiApiKey') || '';
+            populateVoiceList();
+            if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = populateVoiceList;
+            window.addEventListener('beforeunload', saveReadingPosition);
+            switchToUploadView();
+        }
+
+        initialize();
     </script>
 </body>
 </html>
